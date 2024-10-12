@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place Ships</title>
+    <style>
+        /* Basic grid styling */
+        #grid {
+            display: grid;
+            gap: 2px;
+            margin: 20px 0;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: #f0f0f0;
+            border: 1px solid #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .selected {
+            background-color: #66ccff;
+        }
+    </style>
+    <script>
+        let playerName;
+        let gameId;
+        let gridSize;
+
+        // Initialize the game data from URL parameters
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            playerName = urlParams.get('playerName');
+            gameId = urlParams.get('gameId');
+            gridSize = urlParams.get('gridSize');
+            document.getElementById('playerInfo').innerText = `Placing ships for ${playerName}`;
+            createGrid(gridSize);
+        };
+
+        // Create the grid dynamically
+        function createGrid(size) {
+            const gridContainer = document.getElementById('grid');
+            gridContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            gridContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+
+            for (let row = 0; row < size; row++) {
+                for (let col = 0; col < size; col++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.x = col;
+                    cell.dataset.y = row;
+                    cell.onclick = () => toggleCellSelection(cell);
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // Toggle cell selection for ship placement
+        function toggleCellSelection(cell) {
+            cell.classList.toggle('selected');
+        }
+
+        // Place ships based on selected cells
+        async function placeShips() {
+            const selectedCells = Array.from(document.querySelectorAll('.cell.selected'));
+            const shipData = selectedCells.map(cell => ({
+                shipId: `Ship${cell.dataset.y}-${cell.dataset.x}`,
+                size: 1, // Assuming each ship occupies 1 cell
+                coordinates: [[cell.dataset.x, cell.dataset.y]]
+            }));
+
+            console.log("Ship data to send:", shipData); // Log ship data
+
+            const response = await fetch(`/api/battleship/place-ship/${playerName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(shipData),
+            });
+
+            if (response.ok) {
+                alert("Ships placed successfully.");
+                // Redirect to firing page
+                window.location.href = `/fire.html?playerName=${playerName}&gameId=${gameId}`;
+            } else {
+                const errorMessage = await response.text();
+                alert("Error placing ships: " + errorMessage);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1 id="playerInfo"></h1>
+    <div id="grid"></div>
+    <button onclick="placeShips()">Place Ships</button>
+</body>
+</html>
