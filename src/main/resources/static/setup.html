@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Setup</title>
+    <script>
+        async function startGame() {
+            const gridSize = document.getElementById('gridSize').value;
+            const numberOfShips = document.getElementById('numberOfShips').value;
+            const playerName = document.getElementById('playerName').value;
+
+            const response = await fetch(`/api/battleship/create?gridSize=${gridSize}&numberOfShips=${numberOfShips}&player1Name=${playerName}`, {
+                method: 'POST',
+            });
+
+            if (response.ok) {
+                const gameData = await response.json();
+                console.log("Game created with ID:", gameData.gameId);
+                // Redirect to the place ship page with player name
+				window.location.href = `/place-ship.html?playerName=${playerName}&gameId=${gameData.gameId}&gridSize=${gridSize}`;
+
+            } else {
+                const errorMessage = await response.text();
+                alert("Error creating game: " + errorMessage);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Battleship Setup</h1>
+    <label for="playerName">Player Name:</label>
+    <input type="text" id="playerName" required><br><br>
+    <label for="gridSize">Grid Size:</label>
+    <input type="number" id="gridSize" min="5" required><br><br>
+    <label for="numberOfShips">Number of Ships:</label>
+    <input type="number" id="numberOfShips" min="1" required><br><br>
+    <button onclick="startGame()">Start Game</button>
+</body>
+</html>

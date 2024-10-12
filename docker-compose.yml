@@ -1,0 +1,8 @@
+version: '3.8'  # You can remove this line if using newer Docker Compose versions
+services:
+  battleship:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Ensure this points to your actual Dockerfile
+    ports:
+      - "8080:8080"  # Adjust as needed
