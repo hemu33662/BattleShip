@@ -1,77 +1,181 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en">
+
 <head>
-    <title>Battleship Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Missile</title>
+    <style>
+        /* Basic grid styling */
+        .grid {
+            display: grid;
+            gap: 2px;
+            margin: 20px 0;
+        }
+
+        .grid-container {
+            display: flex;
+            justify-content: space-between; /* Align player grids */
+        }
+
+        .player-container {
+            flex: 1;
+            text-align: center;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: #f0f0f0;
+            border: 1px solid #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .disabled {
+            pointer-events: none !important; /* Prevent clicks */
+            background-color: #ccc !important; /* Gray for disabled cells */
+        }
+
+        .hit {
+            background-color: lightgreen !important; /* Green for hit */
+            border: 1px solid springgreen; /* Optional: Darker border for visual feedback */
+        }
+
+        .miss {
+            background-color: lightcoral !important; /* Coral for miss */
+            border: 1px solid palevioletred; /* Optional: Gray border for visual feedback */
+        }
+
+        h2 {
+            text-align: center;
+        }
+    </style>
     <script>
-        async function placeShips(event) {
-            event.preventDefault();
+        let playerName;
+        let gameId;
+        let gridSize;
+        let currentPlayer;
+        let opponent;
 
-            const playerName = document.getElementById("playerName").value;
-            const shipData = []; // Collect ship data from input fields
+        window.onload = function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            playerName = urlParams.get('playerName');
+            gameId = urlParams.get('gameId');
+            gridSize = urlParams.get('gridSize');
+            currentPlayer = playerName;
+            opponent = urlParams.get('opponent') || "player2"; // Assume player2 is the opponent
 
-            // Assume we have input fields for ships; this is just an example
-            const ship1 = { type: "Battleship", coordinates: [0, 0] }; // Add logic to collect real data
-            const ship2 = { type: "Cruiser", coordinates: [1, 1] }; // Example
+            if (!playerName || !gameId || !gridSize) {
+                alert("Missing required parameters! Ensure playerName, gameId, and gridSize are in the URL.");
+                return;
+            }
 
-            shipData.push(ship1, ship2); // Add your ships to the array
+            document.getElementById('playerInfo').innerText = `${playerName}, select a cell to fire at ${opponent}'s grid.`;
+            createGrid('opponent-grid', gridSize, true);  // Only opponent's grid is clickable
+            createGrid('player-grid', gridSize, false);  // Player's own grid is not clickable
+        };
 
-            const response = await fetch('/api/battleship/place-ship/' + playerName, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(shipData),
-            });
+        function createGrid(gridId, size, clickable) {
+            const gridContainer = document.getElementById(gridId);
+            gridContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            gridContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
 
-            if (response.ok) {
-                alert('Ships placed successfully.');
-            } else {
-                const error = await response.text();
-                alert('Error: ' + error);
+            for (let row = 0; row < size; row++) {
+                for (let col = 0; col < size; col++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.x = col;
+                    cell.dataset.y = row;
+
+                    if (clickable) {
+                        cell.onclick = () => fireMissile(cell, col, row); // Enable click for opponent's grid
+                    } else {
+                        cell.classList.add('disabled'); // Disable player's grid from clicks
+                    }
+
+                    gridContainer.appendChild(cell);
+                    console.log(`Created cell at (${col}, ${row})`); // Log cell creation
+                }
             }
         }
 
-        async function fireMissile(event) {
-            event.preventDefault();
+        let gameOver = false;  // Add a gameOver flag to track game state
 
-            const playerName = document.getElementById("playerName").value;
-            const fireRequest = {
-                coordinates: [2, 2] // Collect coordinates from input fields
-            };
+        async function fireMissile(cell, x, y) {
+            if (gameOver) {
+                alert("The game is over!");
+                return;
+            }
 
-            const response = await fetch('/api/battleship/fire/' + playerName, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(fireRequest),
-            });
+            if (cell.classList.contains('disabled')) {
+                alert("You have already fired at this coordinate.");
+                return;
+            }
 
-            if (response.ok) {
-                const result = await response.text();
-                alert(result);
-            } else {
-                const error = await response.text();
-                alert('Error: ' + error);
+            cell.classList.add('disabled');
+
+            try {
+                const response = await fetch(`/api/battleship/fire/${playerName}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gameId: parseInt(gameId),
+                        playerName: playerName,
+                        x: x,
+                        y: y
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.text();
+                    console.log('Server response:', result);
+
+                    cell.classList.remove('hit', 'miss');
+
+                    if (result.includes("Hit!")) {
+                        cell.classList.add('hit');
+                        console.log(`Cell at (${x}, ${y}) marked as hit.`);
+                    } else if (result.includes("Miss!")) {
+                        cell.classList.add('miss');
+                        console.log(`Cell at (${x}, ${y}) marked as miss.`);
+                    }
+
+                    if (result.includes("wins!")) {
+                        gameOver = true;
+                        document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled')); // Disable the whole grid
+                        alert(`${playerName} wins!`);
+                        document.getElementById('playerInfo').innerText = `${playerName} wins! Game over.`;
+                    }
+                } else {
+                    const errorMessage = await response.text();
+                    console.error("Error response:", errorMessage);
+                    alert("Error: " + errorMessage);
+                }
+            } catch (error) {
+                console.error("Fetch error:", error);
+                alert("An error occurred while firing the missile.");
             }
         }
     </script>
 </head>
-<body>
-    <h1>Game in Progress</h1>
-    <p>Player: <span id="playerName"></span></p>
-    
-    <form onsubmit="placeShips(event)">
-        <h2>Place Your Ships</h2>
-        <!-- Add fields to place ships -->
-        <button type="submit">Place Ships</button>
-    </form>
 
-    <form onsubmit="fireMissile(event)">
-        <h2>Fire Missile</h2>
-        <label for="fireCoordinates">Enter Coordinates:</label>
-        <input type="text" id="fireCoordinates" required>
-        <button type="submit">Fire!</button>
-    </form>
+<body>
+    <h1 id="playerInfo"></h1>
+    <div class="grid-container">
+        <div class="player-container">
+            <h2>Your Grid</h2>
+            <div id="player-grid" class="grid"></div> <!-- Player's grid, no interaction -->
+        </div>
+        <div class="player-container">
+            <h2>Opponent's Grid</h2>
+            <div id="opponent-grid" class="grid"></div> <!-- Opponent's grid, interactive -->
+        </div>
+    </div>
 </body>
+
 </html>

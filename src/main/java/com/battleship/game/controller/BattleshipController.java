@@ -10,6 +10,7 @@ import com.battleship.game.service.BattleshipService;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -27,26 +28,32 @@ public class BattleshipController {
     @PostMapping("/create")
     public ResponseEntity<Game> createGame(@RequestParam int gridSize,
                                             @RequestParam int numberOfShips,
-                                            @RequestParam String player1Name) {
-        Game newGame = battleshipService.createGame(new GameDTO(gridSize, numberOfShips), player1Name);
+                                            @RequestParam String player1Name,
+                                            @RequestParam String player2Name) { // Add player2Name
+        GameDTO gameDTO = new GameDTO(gridSize, numberOfShips, player1Name, player2Name);
+        Game newGame = battleshipService.createGame(gameDTO); // Pass DTO directly
         gameId = newGame.getGameId();
-        System.out.println("newGame:"+newGame.getGameId());
+        System.out.println("New game created with ID: " + gameId);
         return ResponseEntity.ok(newGame);
     }
 
-    // Place ships for a player
-    @PostMapping("/place-ship/{playerName}")
+    @PostMapping("/place-ship/{playerName}/{numberOfShips}")
     public ResponseEntity<String> placeShips(@PathVariable String playerName,
+                                             @PathVariable int numberOfShips,
                                              @RequestBody @Validated List<ShipDTO> shipDTOs) {
-        try {
-            for (ShipDTO shipDTO : shipDTOs) {
-                battleshipService.placeShip(gameId, playerName, shipDTO);
-            }
-            return ResponseEntity.ok("Ships placed successfully.");
+          try {
+            // Pass gameId, playerName, and shipDTOs to the service method
+            battleshipService.placeShips(gameId, playerName, numberOfShips, shipDTOs);
+            return ResponseEntity.ok("Ships placed successfully."); // Move return statement here
         } catch (GameNotFoundException | IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                 .body("An unexpected error occurred: " + e.getMessage());
         }
     }
+
+    
 
 
     // Fire a missile

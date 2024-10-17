@@ -3,14 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Place Ships</title>
+    <title>Start Game</title>
     <style>
         /* Basic grid styling */
-        #grid {
+        .grid {
             display: grid;
             gap: 2px;
             margin: 20px 0;
         }
+
+        .grid-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
         .cell {
             width: 40px;
             height: 40px;
@@ -21,28 +27,51 @@
             justify-content: center;
             cursor: pointer;
         }
+
         .selected {
             background-color: #66ccff;
+        }
+
+        .disabled {
+            pointer-events: none;
+            background-color: #ccc;
+        }
+
+        h2 {
+            text-align: center;
         }
     </style>
     <script>
         let playerName;
         let gameId;
         let gridSize;
+        let numberOfShips;
+        let remainingShips;
+        let currentPlayer;
 
-        // Initialize the game data from URL parameters
-        window.onload = function() {
+        window.onload = function () {
             const urlParams = new URLSearchParams(window.location.search);
             playerName = urlParams.get('playerName');
             gameId = urlParams.get('gameId');
             gridSize = urlParams.get('gridSize');
-            document.getElementById('playerInfo').innerText = `Placing ships for ${playerName}`;
-            createGrid(gridSize);
+            numberOfShips = parseInt(urlParams.get('numberOfShips')) || 1;
+            remainingShips = numberOfShips;
+            currentPlayer = urlParams.get('currentPlayer') || "player1"; // Determine which player is placing ships
+
+            if (!playerName || !gameId || !gridSize) {
+                alert("Missing required parameters! Ensure playerName, gameId, gridSize, and numberOfShips are in the URL.");
+                return;
+            }
+
+            document.getElementById('playerInfo').innerText = `Placing ships for ${playerName}. Remaining Ships: ${remainingShips}`;
+            createGrid('player1-grid', gridSize, currentPlayer === "player1");
+            createGrid('player2-grid', gridSize, currentPlayer === "player2");
+            document.getElementById('player1Header').innerText = currentPlayer === "player1" ? `${playerName}'s Grid` : 'Player 1\'s Grid';
+            document.getElementById('player2Header').innerText = currentPlayer === "player2" ? `${playerName}'s Grid` : 'Player 2\'s Grid';
         };
 
-        // Create the grid dynamically
-        function createGrid(size) {
-            const gridContainer = document.getElementById('grid');
+        function createGrid(gridId, size, isActive) {
+            const gridContainer = document.getElementById(gridId);
             gridContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
             gridContainer.style.gridTemplateRows = `repeat(${size}, 1fr)`;
 
@@ -50,52 +79,84 @@
                 for (let col = 0; col < size; col++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
+                    if (!isActive) {
+                        cell.classList.add('disabled'); // Disable grid for the other player
+                    }
                     cell.dataset.x = col;
                     cell.dataset.y = row;
-                    cell.onclick = () => toggleCellSelection(cell);
+                    cell.onclick = () => toggleCellSelection(cell, isActive);
                     gridContainer.appendChild(cell);
                 }
             }
         }
 
-        // Toggle cell selection for ship placement
-        function toggleCellSelection(cell) {
-            cell.classList.toggle('selected');
+        function toggleCellSelection(cell, isActive) {
+            if (!isActive) return; // Prevent interaction with disabled grids
+
+            if (cell.classList.contains('selected')) {
+                cell.classList.remove('selected');
+                remainingShips++;
+            } else if (remainingShips > 0) {
+                cell.classList.add('selected');
+                remainingShips--;
+            }
+            document.getElementById('playerInfo').innerText = `Placing ships for ${playerName}. Remaining Ships: ${remainingShips}`;
         }
 
-        // Place ships based on selected cells
-        async function placeShips() {
-            const selectedCells = Array.from(document.querySelectorAll('.cell.selected'));
+        async function startGame() {
+            const gridSelector = currentPlayer === "player1" ? '#player1-grid .cell.selected' : '#player2-grid .cell.selected';
+            const selectedCells = Array.from(document.querySelectorAll(gridSelector));
+
+            if (selectedCells.length === 0) {
+                alert("No ships selected! Please select at least one ship to place.");
+                return;
+            }
+
             const shipData = selectedCells.map(cell => ({
-                shipId: `Ship${cell.dataset.y}-${cell.dataset.x}`,
-                size: 1, // Assuming each ship occupies 1 cell
-                coordinates: [[cell.dataset.x, cell.dataset.y]]
+                shipId: `${getColumnLetter(cell.dataset.x)}${parseInt(cell.dataset.y) + 1}`,
+                size: 1,
+                coordinates: [[parseInt(cell.dataset.x), parseInt(cell.dataset.y)]]
             }));
 
-            console.log("Ship data to send:", shipData); // Log ship data
+            try {
+                const response = await fetch(`/api/battleship/place-ship/${playerName}/${numberOfShips}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(shipData),
+                });
 
-            const response = await fetch(`/api/battleship/place-ship/${playerName}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(shipData),
-            });
-
-            if (response.ok) {
-                alert("Ships placed successfully.");
-                // Redirect to firing page
-                window.location.href = `/fire.html?playerName=${playerName}&gameId=${gameId}`;
-            } else {
-                const errorMessage = await response.text();
-                alert("Error placing ships: " + errorMessage);
+                if (response.ok) {
+                    alert("Ships placed successfully.");
+                    window.location.href = `/game.html?playerName=${playerName}&gameId=${gameId}&gridSize=${gridSize}`;
+                } else {
+                    const errorMessage = await response.text();
+                    alert("Error starting game: " + errorMessage);
+                }
+            } catch (error) {
+                alert("An error occurred while starting the game.");
             }
+        }
+
+        function getColumnLetter(col) {
+            return String.fromCharCode(65 + col);
         }
     </script>
 </head>
 <body>
     <h1 id="playerInfo"></h1>
-    <div id="grid"></div>
-    <button onclick="placeShips()">Place Ships</button>
+    <div class="grid-container">
+        <div>
+            <h2 id="player1Header">Player 1's Grid</h2>
+            <div id="player1-grid" class="grid"></div>
+        </div>
+        <div>
+            <h2 id="player2Header">Player 2's Grid</h2>
+            <div id="player2-grid" class="grid"></div>
+        </div>
+    </div>
+    <!-- Button text changed to 'Start Game' -->
+    <button onclick="startGame()">Start Game</button>
 </body>
 </html>
