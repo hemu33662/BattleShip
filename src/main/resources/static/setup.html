@@ -8,33 +8,61 @@
         async function startGame() {
             const gridSize = document.getElementById('gridSize').value;
             const numberOfShips = document.getElementById('numberOfShips').value;
-            const playerName = document.getElementById('playerName').value;
+            const player1Name = document.getElementById('player1Name').value;
+            const player2Name = document.getElementById('player2Name').value;
 
-            const response = await fetch(`/api/battleship/create?gridSize=${gridSize}&numberOfShips=${numberOfShips}&player1Name=${playerName}`, {
+            const response = await fetch(`/api/battleship/create?gridSize=${gridSize}&numberOfShips=${numberOfShips}&player1Name=${player1Name}&player2Name=${player2Name}`, {
                 method: 'POST',
             });
 
             if (response.ok) {
                 const gameData = await response.json();
-                console.log("Game created with ID:", gameData.gameId);
-                // Redirect to the place ship page with player name
-				window.location.href = `/place-ship.html?playerName=${playerName}&gameId=${gameData.gameId}&gridSize=${gridSize}`;
+                const gameId = gameData.gameId;
+
+                console.log("Game created with ID:", gameId);
+
+                // Create URLs for Player 1 and Player 2 to place ships
+				const player1Url = `/place-ship.html?playerName=${player1Name}&gameId=${gameId}&gridSize=${gridSize}&numberOfShips=${numberOfShips}`;
+				const player2Url = `/place-ship.html?playerName=${player2Name}&gameId=${gameId}&gridSize=${gridSize}&numberOfShips=${numberOfShips}`;
+
+                // Show buttons for both players
+                document.getElementById('player1Button').innerHTML = `<button onclick="openInNewTab('${player1Url}')">Place Ships for ${player1Name}</button>`;
+                document.getElementById('player2Button').innerHTML = `<button onclick="openInNewTab('${player2Url}')">Place Ships for ${player2Name}</button>`;
 
             } else {
                 const errorMessage = await response.text();
                 alert("Error creating game: " + errorMessage);
             }
         }
+
+        // Function to open URLs in a new tab
+        function openInNewTab(url) {
+            window.open(url, '_blank');
+        }
     </script>
 </head>
 <body>
     <h1>Battleship Setup</h1>
-    <label for="playerName">Player Name:</label>
-    <input type="text" id="playerName" required><br><br>
+
+    <label for="player1Name">Player 1 Name:</label>
+    <input type="text" id="player1Name" required><br><br>
+
+    <label for="player2Name">Player 2 Name:</label>
+    <input type="text" id="player2Name" required><br><br>
+
     <label for="gridSize">Grid Size:</label>
     <input type="number" id="gridSize" min="5" required><br><br>
+
     <label for="numberOfShips">Number of Ships:</label>
     <input type="number" id="numberOfShips" min="1" required><br><br>
+
     <button onclick="startGame()">Start Game</button>
+
+    <h2>Player 1 Ship Placement</h2>
+    <div id="player1Button"></div>
+
+    <h2>Player 2 Ship Placement</h2>
+    <div id="player2Button"></div>
+
 </body>
 </html>
